@@ -1,0 +1,3 @@
+pandas
+lightweight_charts
+TA-Lib
