@@ -1,11 +1,12 @@
 import pandas as pd
+from typing import Optional, Dict, Any
 
 
 class DataStateManager:    
-    def __init__(self):
+    def __init__(self) -> None:
         self.current_index = -1
 
-    def get_latest_record(self, df):
+    def get_latest_record(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         if df is None or df.empty:
             return None
         

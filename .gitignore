@@ -17,6 +17,7 @@ dist/
 
 # Logs
 *.log
+trading.log
 
 # Output data
 algo/output/
