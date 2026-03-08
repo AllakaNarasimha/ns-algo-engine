@@ -1,16 +1,17 @@
 import datetime
+import re
 
 class OrbConfig:
     def __init__(self, range_minutes=15,
                 max_trades_per_day=3,
-                candle_granularity: str = 'minute',
+                candle_granularity: str = '1m',
                 stop_loss_pct=None,
                 trailing_stop_pct=None,
                 target_pct=None,
                 require_boundary_touch: bool = True):
-        self.candle_granularity = candle_granularity.lower()
-        if self.candle_granularity not in ('minute', 'hour'):
-            raise ValueError("candle_granularity must be 'minute' or 'hour'")
+        self.candle_granularity = candle_granularity
+        if not re.match(r'^\d+(MS|S|m|h|d|w|M)$', self.candle_granularity):
+            raise ValueError("candle_granularity must be in the format <number><unit> where unit is one of MS, S, m, h, d, w, M")
         
         self.range_minutes = range_minutes
         self.max_trades_per_day = max_trades_per_day
@@ -29,5 +30,5 @@ class OrbConfig:
     @classmethod
     def from_app_config(cls, app_config):
         """Create OrbConfig from AppConfig's strategy_params."""
-        params = app_config.strategy_params
+        params = {k: v for k, v in app_config.strategy_params.items() if k != 'additional_indicators'}
         return cls(**params)

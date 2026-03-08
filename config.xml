@@ -2,27 +2,57 @@
 <config>
     <!-- Database and Symbol Configuration -->
     <db_dir>data</db_dir>
-    <db_file>06jan26_history.db</db_file>
+    <db_file>06jan26_BAJAJFINSV-EQ.db</db_file>
     <symbol>BAJAJFINSV</symbol>
     <underlying>BAJAJFINSV</underlying>
     <segment>INDICES</segment>
     <instrument_type>EQ</instrument_type>
     <exchange>NSE</exchange>
-    
+
     <!-- Strategy Configuration -->
     <strategy>
         <strategy_name>ORB</strategy_name>
         <strategy_params>
             <range_minutes>15</range_minutes>
             <max_trades_per_day>3</max_trades_per_day>
-            <candle_granularity>minute</candle_granularity>
+            <candle_granularity>5m</candle_granularity>
             <stop_loss_pct>0.1</stop_loss_pct>
             <trailing_stop_pct>0.2</trailing_stop_pct>
             <target_pct></target_pct>
             <require_boundary_touch>true</require_boundary_touch>
+            <additional_indicators>
+                <indicator>
+                    <name>RSI</name>
+                    <params>
+                        <param>
+                            <period>14</period>
+                            <color>purple</color>
+                        </param>
+
+                    </params>
+                </indicator>
+                <multi_indicator>
+                    <name>EMA</name>
+                    <params>
+                        <param>
+                            <period>21</period>
+                            <color>green</color>
+                        </param>
+                        <param>
+                            <period>50</period>
+                            <color>purple</color>
+                        </param>
+                        <param>
+                            <period>200</period>
+                            <color>white</color>
+                        </param>
+
+                    </params>
+                </multi_indicator>
+            </additional_indicators>
         </strategy_params>
     </strategy>
-    
+
     <!-- Data Configuration -->
     <data_mode>historical</data_mode>
     <use_multi_db>false</use_multi_db>
@@ -32,19 +62,19 @@
     <end_time>15:00</end_time>
     <preprocessing_days>3</preprocessing_days>
     <expiry_index>0</expiry_index>
-    
+
     <!-- Trading Configuration -->
     <pl_percent>0.5</pl_percent>
     <initialization_periods>0</initialization_periods>
     <live>false</live>
-    
+
     <!-- Output Configuration -->
-    <trades_csv>output/nifty_orb.csv</trades_csv>
-    <export_csv>output/nifty_orb_prices_5_tv.html</export_csv>
-    
+    <trades_csv>output/SYMBOL_orb.csv</trades_csv>
+    <export_csv>output/SYMBOL_orb_prices_5_tv.html</export_csv>
+
     <!-- Candle Configuration -->
     <candle_freq>5min</candle_freq>
-    
+
     <!-- Chart Configuration -->
     <chart_library>tv</chart_library>
     <tv_autoupdate>true</tv_autoupdate>
@@ -59,28 +89,4 @@
     <tv_pl_separate_panel>true</tv_pl_separate_panel>
     <tv_volume_ratio>0.25</tv_volume_ratio>
     <volume_mode>tick_count</volume_mode>
-    
-    <!-- Chart Indicators Configuration -->
-    <NSChart>
-        <Indicators>
-            <Indicator>
-                <Name>ema</Name>
-                <Value>5</Value>
-                <Type>line</Type>
-                <Color>#FF6B35</Color>
-                <LineWidth>1</LineWidth>
-                <RunOnCandle>close</RunOnCandle>
-                <Visible>true</Visible>
-            </Indicator>
-            <Indicator>
-                <Name>ema</Name>
-                <Value>20</Value>
-                <Type>line</Type>
-                <Color>#004E89</Color>
-                <LineWidth>1</LineWidth>
-                <RunOnCandle>close</RunOnCandle>
-                <Visible>true</Visible>
-            </Indicator>
-        </Indicators>
-    </NSChart>
 </config>

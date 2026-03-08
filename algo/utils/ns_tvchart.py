@@ -1,8 +1,5 @@
 import os
 import json
-from typing import Dict, List, Any
-
-from algo.templates.trading_view_chart import TradingViewChart
 try:
     import talib
     _HAS_TALIB = True
@@ -13,14 +10,15 @@ import pandas as pd
 
 
 class TvChart:
-    def __init__(self, cfg):
+    def __init__(self, symbol, cfg):
+        self.symbol = symbol
         self.cfg = cfg
         self._update_counter = 0
         self._last_export_path = None
         self._opened = False
         self._placeholder_written = False
         self._pl_max_abs = 1.0
-        self.trading_view_chart = TradingViewChart()
+        self.indicators = []
 
     def _load_html_template(self, filename):
         # Template files are in the templates/ directory
@@ -48,10 +46,8 @@ class TvChart:
         if getattr(self.cfg, 'tv_auto_open', False) and not self._opened:
             import webbrowser
             try:
-                # webbrowser.open('file://' + os.path.abspath(html_path))
+                webbrowser.open('file://' + os.path.abspath(html_path))
                 self._opened = True
-                self.trading_view_chart.chart.show()
-                
             except Exception:
                 pass
         return html_path
@@ -95,30 +91,43 @@ class TvChart:
             if 'signal' in df.columns:
                 df['signal'] = df['signal'].apply(lambda x: x.get('signal') if isinstance(x, dict) else x)
             candles_json = self._prepare_candles(df)
-            ema5_series = self._prepare_ema_series(df, 'ema5', candles_json)
-            ema20_series = self._prepare_ema_series(df, 'ema20', candles_json)
-            indicators = [
-                { 'name': 'EMA5', 'color': 'yellow', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema5_series},
-                { 'name': 'EMA20', 'color': 'cyan', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema20_series}
-            ]
+            
+            # Add additional indicators
+            if self.cfg.additional_indicators:
+                for ind in self.cfg.additional_indicators:
+                    name = ind['name']
+                    params = ind['params']
+                    if name == 'EMA':
+                        if ind['type'] == 'multi_indicator':
+                            for param in params:
+                                period = param['period']
+                                color = param['color']
+                                ema_series = self._prepare_ema_series(df, f'ema{period}', candles_json)
+                                self.indicators.append({'name': f'EMA{period}', 'color': color, 'lineWidth': 1, 'priceLineVisible': False, 'data': ema_series})
+            else:
+                ema5_series = self._prepare_ema_series(df, 'ema5', candles_json)
+                ema20_series = self._prepare_ema_series(df, 'ema20', candles_json)
+                self.indicators = [
+                    { 'name': 'EMA5', 'color': 'yellow', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema5_series},
+                    { 'name': 'EMA20', 'color': 'cyan', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema20_series}
+                ]
+
             pivot_lines = self._prepare_pivot_lines(df, candles_json)
             markers = self._prepare_markers(df, completed_trades, candles_json)
             trade_data = self._prepare_trade_data(completed_trades, df, candles_json)
             cum_pl_series = self._prepare_cum_pl(completed_trades, df, candles_json)
             html_template = self._load_html_template('tv_chart_template.html')
-            html_template = self._apply_template_replacements(html_template, final, candles_json, indicators, markers, cum_pl_series, pivot_lines, trade_data)
+            symbol = self.cfg.export_csv.split('_')[0]
+            html_template = self._apply_template_replacements(html_template, final, candles_json, self.indicators, markers, cum_pl_series, pivot_lines, trade_data, symbol)
             self._last_export_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), self.cfg.export_csv) 
 
             with open(self._last_export_path, 'w', encoding='utf-8') as f:
                 f.write(html_template)
-            
-            self.trading_view_chart.generate_from_html_template(df, cum_pl_series, markers, trade_data, True, True, None, None)
             if getattr(self.cfg, 'tv_auto_open', False) and not self._opened:
                 import webbrowser
                 try:
-                    # webbrowser.open('file://' + os.path.abspath(self._last_export_path))
+                    webbrowser.open('file://' + os.path.abspath(self._last_export_path))
                     self._opened = True
-                    self.trading_view_chart.chart.show()
                 except Exception:
                     pass
             return self._last_export_path
@@ -133,7 +142,7 @@ class TvChart:
                 pass
             return None
 
-    def _apply_template_replacements(self, html_template, final, candles_json, indicators, markers, cum_pl_series, pivot_lines, trade_data):
+    def _apply_template_replacements(self, html_template, final, candles_json, indicators, markers, cum_pl_series, pivot_lines, trade_data, symbol):
         separate_pl = getattr(self.cfg, 'tv_pl_separate_panel', False)
         if separate_pl:
             html_template = html_template.replace('%PLDIV%', "<div id='plpanel'></div>") \
@@ -156,7 +165,7 @@ class TvChart:
                 "    metas.forEach(function(m){ if(m && m.parentNode) m.parentNode.removeChild(m); });\n"
                 "    if(window.__tv_auto_refresh_interval_ids && Array.isArray(window.__tv_auto_refresh_interval_ids)) {\n"
                 "      window.__tv_auto_refresh_interval_ids.forEach(function(id){ try{ clearInterval(id); }catch(e){} });\n"
-                "    }\n"
+                "    }catch(e){}\n"
                 "    try{ window.location.reload = function(){ /* disabled by final export */ }; }catch(e){}\n"
                 "  }catch(e){}\n"
                 "})();\n"
@@ -165,14 +174,20 @@ class TvChart:
             if '</body></html>' in html_template:
                 html_template = html_template.replace('</body></html>', no_refresh_script + '\n</body></html>')
 
+        data_obj = {
+            'symbol_name': self.symbol,
+            'data': {
+                'candles': candles_json,
+                'indicators': indicators,
+                'markers': markers,
+                'cum_pl': cum_pl_series,
+                'trade_data': trade_data
+            }
+        }
         html_template = (html_template
-                         .replace('__CANDLES__', json.dumps(candles_json))
-                         .replace('__INDICATORS__', json.dumps(indicators))
-                         .replace('__MARKERS__', json.dumps(markers))
-                         .replace('__CUM_PL__', json.dumps(cum_pl_series))
+                         .replace('__SYMBOL_DATA__', json.dumps(data_obj))
                          .replace('__PL_HOVER__', 'true' if getattr(self.cfg, 'pl_line_hover_only', False) else 'false')
-                         .replace('__VOL_RATIO__', str(getattr(self.cfg, 'tv_volume_ratio', 0.25)))
-                         .replace('__TRADE_DATA__', json.dumps(trade_data))
+                         .replace('__VOL_RATIO__', str(getattr(self.cfg, 'tv_volume_ratio', 0.25)))                         
                          .replace('%SEPARATE_PL%', 'true' if separate_pl else 'false'))
 
         pivot_lines_js = json.dumps(pivot_lines)
@@ -193,16 +208,32 @@ class TvChart:
         return html_template
 
     def _prepare_emas(self, df):
-        if 'ema5' not in df.columns or df['ema5'].isna().all():
-            if _HAS_TALIB:
-                df['ema5'] = talib.EMA(df['close'].astype(float), timeperiod=5)
-            else:
-                df['ema5'] = df['close'].rolling(5, min_periods=1).mean()
-        if 'ema20' not in df.columns or df['ema20'].isna().all():
-            if _HAS_TALIB:
-                df['ema20'] = talib.EMA(df['close'].astype(float), timeperiod=20)
-            else:
-                df['ema20'] = df['close'].rolling(20, min_periods=1).mean()
+        # Compute additional indicators
+        if self.cfg.additional_indicators:
+            for ind in self.cfg.additional_indicators:
+                name = ind['name']
+                params = ind['params']
+                if name == 'EMA':
+                    if ind['type'] == 'multi_indicator':
+                        for param in params:
+                            period = param['period']
+                            if _HAS_TALIB:
+                                ema_values = talib.EMA(df['close'].astype(float), timeperiod=period)
+                            else:
+                                ema_values = df['close'].rolling(period, min_periods=1).mean()
+                            df[f'ema{period}'] = ema_values
+        else:
+            if 'ema5' not in df.columns or df['ema5'].isna().all():
+                if _HAS_TALIB:
+                    df['ema5'] = talib.EMA(df['close'].astype(float), timeperiod=5)
+                else:
+                    df['ema5'] = df['close'].rolling(5, min_periods=1).mean()
+            if 'ema20' not in df.columns or df['ema20'].isna().all():
+                if _HAS_TALIB:
+                    df['ema20'] = talib.EMA(df['close'].astype(float), timeperiod=20)
+                else:
+                    df['ema20'] = df['close'].rolling(20, min_periods=1).mean()
+
 
     def _prepare_candles(self, df):
         candles_json = []
@@ -367,188 +398,3 @@ class TvChart:
             if t_unix is None:
                 continue
             pl_list = exit_pl_map.get(ts_key)
-            text_field = ''
-            if pl_list:
-                if tv_pl_multiline:
-                    text_field = "\n".join(f"{d}:{txt}" for (d, _, txt) in pl_list)
-                else:
-                    total_pl = sum(v for (_, v, _) in pl_list)
-                    agg_txt = f"+{total_pl:.1f}" if total_pl >= 0 else f"{total_pl:.1f}"
-                    if len(pl_list) == 1:
-                        d, v, single_txt = pl_list[0]
-                        agg_txt = f"{d}:{agg_txt}"
-                    text_field = agg_txt
-            pos = 'belowBar' if sig == 'buy' else 'aboveBar'
-            base_color = '#26a69a' if sig == 'buy' else '#ef5350'
-            color = base_color
-            if text_field and tv_pl_color_scale and pl_list:
-                if tv_pl_multiline:
-                    magnitude = max(abs(v) for (_, v, _) in pl_list)
-                else:
-                    magnitude = abs(sum(v for (_, v, _) in pl_list))
-                norm = min(1.0, magnitude / max(self._pl_max_abs, 1e-9))
-                alpha = 0.35 + 0.55 * norm
-                color = ('rgba(38,166,154,' if sig == 'buy' else 'rgba(239,83,80,') + f"{alpha:.2f})"
-            if text_field and padding_lines > 0:
-                pad = "\n" * padding_lines
-                text_field = (pad + text_field) if pos == 'aboveBar' else (text_field + pad)
-            #markers.append({
-            #    'time': t_unix,
-            #    'position': pos,
-            #    'color': color,
-            #    'shape': 'arrowUp' if sig == 'buy' else 'arrowDown',
-            #    'text': text_field
-            #})
-        if completed_trades:
-            for tr in completed_trades:
-                entry_dt = tr.get('entry_datetime')
-                exit_dt = tr.get('exit_datetime')
-                pos_type = (tr.get('position_type') or '').lower()
-                try:
-                    pl_val = float(tr.get('pl', 0) or 0)
-                except Exception:
-                    pl_val = 0.0
-                if abs(pl_val) > self._pl_max_abs:
-                    self._pl_max_abs = abs(pl_val)
-                if entry_dt:
-                    e_unix = self._get_unix_time(entry_dt, df, ts_time_map)
-                    if e_unix is not None:
-                        entry_sig = 'buy' if 'long' in pos_type else 'sell'
-                        entry_pos = 'belowBar' if entry_sig == 'buy' else 'aboveBar'
-                        entry_color = ('rgba(38,166,154,0.55)' if entry_sig == 'buy' else 'rgba(239,83,80,0.55)')
-                        markers.append({
-                            'time': e_unix,
-                            'position': entry_pos,
-                            'color': entry_color,
-                            'shape': 'arrowUp' if entry_sig == 'buy' else 'arrowDown',
-                            'text': 'E'
-                        })
-                if exit_dt:
-                    x_unix = self._get_unix_time(exit_dt, df, ts_time_map)
-                    if x_unix is not None:
-                        exit_sig = 'sell' if 'long' in pos_type else 'buy'
-                        exit_pos = 'aboveBar' if exit_sig == 'sell' else 'belowBar'
-                        magnitude = min(1.0, abs(pl_val) / max(self._pl_max_abs, 1e-9)) if self._pl_max_abs > 0 else 0.0
-                        alpha = 0.35 + 0.55 * magnitude
-                        base = ('rgba(38,166,154,' if pl_val >= 0 else 'rgba(239,83,80,')
-                        exit_color = base + f"{alpha:.2f})"
-                        markers.append({
-                            'time': x_unix,
-                            'position': exit_pos,
-                            'color': exit_color,
-                            'shape': 'arrowUp' if exit_sig == 'buy' else 'arrowDown',
-                            'text': f"{pl_val:+.1f}"
-                        })
-        return markers
-
-    def _prepare_trade_data(self, completed_trades, df, candles_json) -> Dict[str, List[Dict[str, Any]]]:
-        trade_data = {}
-        ts_time_map = {pd.to_datetime(ts): c['time'] for ts, c in zip(df.index, candles_json)}
-
-        freq = None
-        try:
-            freq = pd.infer_freq(df.index)
-        except Exception:
-            freq = None
-        if freq is None:
-            cand_attrs = ['candle_minutes', 'candle_size', 'candle_mins', 'candle', 'timeframe', 'interval', 'bar_minutes', 'bar_size']
-            found = None
-            for a in cand_attrs:
-                if hasattr(self.cfg, a):
-                    found = getattr(self.cfg, a)
-                    break
-            if found is not None:
-                try:
-                    n = int(found)
-                    freq_to_use = f"{n}min"
-                except Exception:
-                    freq_to_use = str(found)
-            else:
-                freq_to_use = '1min'
-        else:
-            freq_to_use = freq
-
-        def _map_dt(dt_val):
-            try:
-                ts_key = pd.to_datetime(dt_val, utc=True)
-            except Exception:
-                return None
-            try:
-                rounded = ts_key.round(freq_to_use)
-            except Exception:
-                rounded = ts_key.round('1min')
-            t_unix = ts_time_map.get(rounded)
-            if t_unix is None:
-                t_unix = ts_time_map.get(ts_key)
-            if t_unix is None and ts_time_map:
-                nearest = min(ts_time_map.keys(), key=lambda k: abs(k - ts_key))
-                t_unix = ts_time_map.get(nearest)
-            return t_unix
-
-        for idx, tr in enumerate(completed_trades, start=1):
-            entry_dt = tr.get('entry_datetime')            
-            exit_dt = tr.get('exit_datetime')
-            stop_loss = tr.get('stop_loss')
-            entry_price = tr.get('entry_price')
-            exit_price = tr.get('exit_price')
-            entry_option_price = tr.get('entry_option_price')
-            exit_option_price = tr.get('exit_option_price')
-            symbol = tr.get('option_symbol')
-            pl_val = tr.get('pl')
-
-            try:
-                pl_num = float(pl_val) if pl_val is not None else 'N/A'
-            except Exception:
-                pl_num = 'N/A'
-
-            trade_info = {
-                'id': idx,
-                'position_type': tr.get('position_type', 'Unknown'),
-                'symbol': symbol,
-                'entry_datetime': str(entry_dt) if entry_dt else None,
-                'exit_datetime': str(exit_dt) if exit_dt else None,
-                'stop_loss': str(stop_loss) if stop_loss else None,
-                'entry_price': float(entry_price) if entry_price is not None else 'N/A',
-                'exit_price': float(exit_price) if exit_price is not None else None,
-                'entry_option_price': float(entry_option_price) if entry_option_price is not None else None,
-                'exit_option_price': float(exit_option_price) if exit_option_price is not None else None,
-                'pl': pl_num
-            }
-
-            if entry_dt:
-                e_unix = _map_dt(entry_dt)
-                if e_unix is not None:
-                    trade_data.setdefault(str(e_unix), []).append(trade_info)
-            if exit_dt:
-                x_unix = _map_dt(exit_dt)
-                if x_unix is not None:
-                    trade_data.setdefault(str(x_unix), []).append(trade_info)
-
-        if getattr(self.cfg, 'tv_debug', False):
-            try:
-                print(f"Prepared trade data: {json.dumps(trade_data, indent=2)}")
-            except Exception:
-                pass
-        return trade_data
-
-    def _prepare_cum_pl(self, completed_trades, df, candles_json):
-        cum_pl_series = []
-        if getattr(self.cfg, 'show_pl_line', True) and completed_trades:
-            closed = [t for t in completed_trades if t.get('exit_datetime') is not None]
-            closed_sorted = sorted(closed, key=lambda t: pd.to_datetime(t.get('exit_datetime'), utc=True))
-            running = 0.0
-            pl_map = {}
-            for t in closed_sorted:
-                exit_dt = pd.to_datetime(t.get('exit_datetime'), utc=True)
-                running += float(t.get('pl', 0))
-                exit_dt = exit_dt.round('1min')
-                pl_map[exit_dt] = running
-            ff_val = 0.0
-            for ts in df.index:
-                if ts in pl_map:
-                    ff_val = pl_map[ts]
-                cum_pl_series.append({
-                    'time': int(ts.timestamp()),
-                    'value': float(ff_val)
-                })
-        return cum_pl_series
