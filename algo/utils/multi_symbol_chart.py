@@ -398,3 +398,114 @@ class MultiSymbolChart:
                             time: nearestEntry,
                             position: isLong ? 'belowBar' : 'aboveBar',
                             color: isLong ? 'rgba(38,166,154,0.6)' : 'rgba(239,83,80,0.6)',
+                            shape: isLong ? 'arrowUp' : 'arrowDown',
+                            text: 'E'
+                        });
+                    }
+                }
+                
+                // Exit marker
+                if (trade.exit_datetime) {
+                    const exitTime = Math.floor(new Date(trade.exit_datetime).getTime() / 1000);
+                    const nearestExit = findNearestTime(exitTime);
+                    if (nearestExit) {
+                        const pl = parseFloat(trade.pl || 0);
+                        const isLong = posType.includes('long');
+                        markers.push({
+                            time: nearestExit,
+                            position: isLong ? 'aboveBar' : 'belowBar',
+                            color: pl >= 0 ? 'rgba(38,166,154,0.8)' : 'rgba(239,83,80,0.8)',
+                            shape: isLong ? 'arrowDown' : 'arrowUp',
+                            text: `${pl >= 0 ? '+' : ''}${pl.toFixed(1)}`
+                        });
+                    }
+                }
+            });
+            
+            return markers;
+        }
+        
+        // Update statistics
+        function updateStats(symbol, trades) {
+            const statsDiv = document.getElementById('stats');
+            
+            if (!trades || trades.length === 0) {
+                statsDiv.innerHTML = `<div><strong>${symbol}</strong></div><div>No trades</div>`;
+                return;
+            }
+            
+            let totalPL = 0;
+            let wins = 0;
+            let losses = 0;
+            
+            trades.forEach(trade => {
+                const pl = parseFloat(trade.pl || 0);
+                totalPL += pl;
+                if (pl > 0) wins++;
+                else if (pl < 0) losses++;
+            });
+            
+            const winRate = trades.length > 0 ? (wins / trades.length * 100).toFixed(1) : 0;
+            const plClass = totalPL >= 0 ? 'positive' : 'negative';
+            
+            statsDiv.innerHTML = `
+                <div style="margin-bottom: 8px;"><strong>${symbol}</strong></div>
+                <div class="stat-row">
+                    <span class="stat-label">Total Trades:</span>
+                    <span class="stat-value">${trades.length}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Wins / Losses:</span>
+                    <span class="stat-value">${wins} / ${losses}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Win Rate:</span>
+                    <span class="stat-value">${winRate}%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Total P&L:</span>
+                    <span class="stat-value ${plClass}">${totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)}</span>
+                </div>
+            `;
+        }
+        
+        // Initialize
+        initChart();
+        
+        // Populate symbol selector
+        const selector = document.getElementById('symbol-selector');
+        Object.keys(allSymbolsData).sort().forEach(symbol => {
+            const option = document.createElement('option');
+            option.value = symbol;
+            option.textContent = symbol;
+            selector.appendChild(option);
+        });
+        
+        // Auto-select first symbol
+        if (Object.keys(allSymbolsData).length > 0) {
+            const firstSymbol = Object.keys(allSymbolsData).sort()[0];
+            selector.value = firstSymbol;
+            loadSymbol(firstSymbol);
+        }
+        
+        // Handle symbol change
+        selector.addEventListener('change', (e) => {
+            loadSymbol(e.target.value);
+        });
+        
+        // Update legend on crosshair move
+        const legendEl = document.getElementById('legend');
+        chart.subscribeCrosshairMove(param => {
+            if (!param.time || !currentSymbol) {
+                legendEl.textContent = currentSymbol || 'Select a symbol';
+                return;
+            }
+            
+            const data = param.seriesData.get(candleSeries);
+            if (data) {
+                legendEl.textContent = `${currentSymbol} | O:${data.open.toFixed(2)} H:${data.high.toFixed(2)} L:${data.low.toFixed(2)} C:${data.close.toFixed(2)}`;
+            }
+        });
+    </script>
+</body>
+</html>'''

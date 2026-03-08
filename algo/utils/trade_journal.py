@@ -166,3 +166,4 @@ class TradeJournal:
             self.logger.info(f"Winning Trades: {len(journal[journal['profit_loss'] > 0])}")
             self.logger.info(f"Losing Trades: {len(journal[journal['profit_loss'] < 0])}")
             self.logger.info(f"Win Rate: {len(journal[journal['profit_loss'] > 0]) / len(journal) * 100:.2f}%")
+

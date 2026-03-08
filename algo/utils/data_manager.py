@@ -56,3 +56,4 @@ class DataManager:
         df = self.get_live_stock_data(self.symbol) if islive else self.get_historical_data(self.symbol, None, None)
         return df
     
+    
