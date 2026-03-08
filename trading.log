@@ -1778,3 +1778,59 @@
 2026-03-08 10:43:37,183 - INFO - Opened LONG position at 2075.8 on 2026-01-06 10:20:00+05:30
 2026-03-08 10:43:37,207 - INFO - Closed LONG position: P&L=-0.50
 2026-03-08 10:43:37,211 - INFO - Saved trade: 11, P&L=-0.5
+2026-03-08 10:54:04,388 - INFO - Opened SHORT position at 2066.1 on 2025-12-08 10:10:00+05:30
+2026-03-08 10:54:04,398 - INFO - Closed SHORT position: P&L=-6.50
+2026-03-08 10:54:04,401 - INFO - Saved trade: 0, P&L=-6.5
+2026-03-08 10:54:04,697 - INFO - New trading day detected: 2025-12-09. Resetting ORB state.
+2026-03-08 10:54:04,881 - INFO - Opened LONG position at 2061.3 on 2025-12-09 11:15:00+05:30
+2026-03-08 10:54:04,912 - INFO - Closed LONG position: P&L=10.00
+2026-03-08 10:54:04,916 - INFO - Saved trade: 1, P&L=10.0
+2026-03-08 10:54:05,065 - INFO - New trading day detected: 2025-12-10. Resetting ORB state.
+2026-03-08 10:54:05,318 - INFO - New trading day detected: 2025-12-11. Resetting ORB state.
+2026-03-08 10:54:05,652 - INFO - New trading day detected: 2025-12-12. Resetting ORB state.
+2026-03-08 10:54:05,792 - INFO - Opened LONG position at 2082.5 on 2025-12-12 12:55:00+05:30
+2026-03-08 10:54:05,798 - INFO - Closed LONG position: P&L=-0.20
+2026-03-08 10:54:05,801 - INFO - Saved trade: 2, P&L=-0.2
+2026-03-08 10:54:05,896 - INFO - New trading day detected: 2025-12-15. Resetting ORB state.
+2026-03-08 10:54:06,160 - INFO - New trading day detected: 2025-12-16. Resetting ORB state.
+2026-03-08 10:54:06,195 - INFO - Opened SHORT position at 2049.7 on 2025-12-16 10:05:00+05:30
+2026-03-08 10:54:06,209 - INFO - Closed SHORT position: P&L=-3.40
+2026-03-08 10:54:06,212 - INFO - Saved trade: 3, P&L=-3.4
+2026-03-08 10:54:06,407 - INFO - New trading day detected: 2025-12-17. Resetting ORB state.
+2026-03-08 10:54:06,542 - INFO - Opened SHORT position at 2023.0 on 2025-12-17 12:05:00+05:30
+2026-03-08 10:54:06,594 - INFO - Closed SHORT position: P&L=6.80
+2026-03-08 10:54:06,596 - INFO - Saved trade: 4, P&L=6.8
+2026-03-08 10:54:06,672 - INFO - New trading day detected: 2025-12-18. Resetting ORB state.
+2026-03-08 10:54:06,733 - INFO - Opened LONG position at 2028.4 on 2025-12-18 10:25:00+05:30
+2026-03-08 10:54:06,740 - INFO - Closed LONG position: P&L=0.00
+2026-03-08 10:54:06,742 - INFO - Saved trade: 5, P&L=0
+2026-03-08 10:54:06,939 - INFO - New trading day detected: 2025-12-19. Resetting ORB state.
+2026-03-08 10:54:07,196 - INFO - New trading day detected: 2025-12-22. Resetting ORB state.
+2026-03-08 10:54:07,682 - INFO - New trading day detected: 2025-12-23. Resetting ORB state.
+2026-03-08 10:54:08,075 - INFO - New trading day detected: 2025-12-24. Resetting ORB state.
+2026-03-08 10:54:08,370 - INFO - Opened SHORT position at 2030.9 on 2025-12-24 14:20:00+05:30
+2026-03-08 10:54:08,388 - INFO - Closed SHORT position: P&L=-0.10
+2026-03-08 10:54:08,391 - INFO - Saved trade: 6, P&L=-0.1
+2026-03-08 10:54:08,416 - INFO - New trading day detected: 2025-12-26. Resetting ORB state.
+2026-03-08 10:54:08,470 - INFO - Opened SHORT position at 2020.6 on 2025-12-26 10:25:00+05:30
+2026-03-08 10:54:08,476 - INFO - Closed SHORT position: P&L=-4.10
+2026-03-08 10:54:08,478 - INFO - Saved trade: 7, P&L=-4.1
+2026-03-08 10:54:08,753 - INFO - New trading day detected: 2025-12-29. Resetting ORB state.
+2026-03-08 10:54:08,890 - INFO - Opened SHORT position at 1999.7 on 2025-12-29 11:30:00+05:30
+2026-03-08 10:54:08,925 - INFO - Closed SHORT position: P&L=-5.80
+2026-03-08 10:54:08,927 - INFO - Saved trade: 8, P&L=-5.8
+2026-03-08 10:54:09,070 - INFO - New trading day detected: 2025-12-30. Resetting ORB state.
+2026-03-08 10:54:09,095 - INFO - Opened SHORT position at 1996.0 on 2025-12-30 09:50:00+05:30
+2026-03-08 10:54:09,107 - INFO - Closed SHORT position: P&L=-2.00
+2026-03-08 10:54:09,110 - INFO - Saved trade: 9, P&L=-2.0
+2026-03-08 10:54:09,334 - INFO - New trading day detected: 2025-12-31. Resetting ORB state.
+2026-03-08 10:54:09,598 - INFO - New trading day detected: 2026-01-01. Resetting ORB state.
+2026-03-08 10:54:09,765 - INFO - Opened SHORT position at 2030.9 on 2026-01-01 12:40:00+05:30
+2026-03-08 10:54:09,781 - INFO - Closed SHORT position: P&L=-0.80
+2026-03-08 10:54:09,783 - INFO - Saved trade: 10, P&L=-0.8
+2026-03-08 10:54:09,882 - INFO - New trading day detected: 2026-01-02. Resetting ORB state.
+2026-03-08 10:54:10,277 - INFO - New trading day detected: 2026-01-05. Resetting ORB state.
+2026-03-08 10:54:10,779 - INFO - New trading day detected: 2026-01-06. Resetting ORB state.
+2026-03-08 10:54:10,838 - INFO - Opened LONG position at 2075.8 on 2026-01-06 10:20:00+05:30
+2026-03-08 10:54:10,851 - INFO - Closed LONG position: P&L=-0.50
+2026-03-08 10:54:10,854 - INFO - Saved trade: 11, P&L=-0.5

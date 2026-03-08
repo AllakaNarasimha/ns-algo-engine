@@ -1,13 +1,14 @@
 import pandas as pd
 from algo.engine.data_state_manager import DataStateManager
 from algo.engine.trade_manager import TradeManager
+from typing import Dict, Any
 from algo.utils.app_config import AppConfig
 from algo.utils.data_manager import DataManager
 from algo.utils.trade_journal import TradeJournal
 from algo.utils.ns_tvchart import TvChart
 
 class Controller:
-    def __init__(self, symbol_info, app_config: AppConfig):
+    def __init__(self, symbol_info: Dict[str, Any], app_config: AppConfig):
         self.symbol = symbol_info['symbol']
         self.symbol_instrument_type = symbol_info['instrument_type']
         self.app_config = app_config

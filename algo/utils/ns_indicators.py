@@ -13,7 +13,7 @@ except Exception:
 class NSIndicators:
     def __init__(self, df):
         self.df = df
-        # Load AppConfig once and store it
+        # Load AppConfig once and store it (default file config.xml)
         self.config = AppConfig.from_xml()
 
     def update_emas(self, df, emas = []):
