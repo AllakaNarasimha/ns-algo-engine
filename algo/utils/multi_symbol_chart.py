@@ -1,5 +1,8 @@
 import os
 import json
+import threading
+import http.server
+import socketserver
 import pandas as pd
 
 
@@ -8,6 +11,20 @@ class MultiSymbolChart:
     Consolidates multiple symbol charts into a single interactive viewer.
     Allows switching between symbols via dropdown.
     """
+    _server_thread = None
+
+    def _start_server(self):
+        if MultiSymbolChart._server_thread is not None:
+            return
+        def run_server():
+            port = 8000
+            os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            handler = http.server.SimpleHTTPRequestHandler
+            with socketserver.TCPServer(("", port), handler) as httpd:
+                print(f"Serving HTTP on port {port}")
+                httpd.serve_forever()
+        MultiSymbolChart._server_thread = threading.Thread(target=run_server, daemon=True)
+        MultiSymbolChart._server_thread.start()
     
     def __init__(self, cfg):
         self.cfg = cfg
@@ -145,9 +162,13 @@ class MultiSymbolChart:
             
             # Auto-open if configured
             if getattr(self.cfg, 'tv_auto_open', False):
-                import webbrowser
+                import subprocess
                 try:
-                    webbrowser.open('file://' + os.path.abspath(output_path))
+                    self._start_server()
+                    relative_path = os.path.relpath(output_path, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                    url = f"http://localhost:8000/{relative_path.replace(os.sep, '/')}"
+                    print(f"Opening browser with URL: {url}")
+                    subprocess.run(f'"$BROWSER" "{url}"', shell=True, check=False)
                 except Exception as e:
                     print(f"Could not auto-open browser: {e}")
             

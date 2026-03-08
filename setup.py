@@ -44,11 +44,17 @@ setup(
     description='NS Algorithmic Trading Engine',
     author='NS',
     packages=find_packages(),
+    py_modules=['main'],
     install_requires=read_requirements(),
     python_requires='>=3.7',
     include_package_data=True,
     zip_safe=False,
     cmdclass={
         'install': PostInstallCommand,
+    },
+    entry_points={
+        'console_scripts': [
+            'ns-algo=main:main',
+        ],
     },
 )

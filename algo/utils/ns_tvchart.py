@@ -1,5 +1,8 @@
 import os
 import json
+import threading
+import http.server
+import socketserver
 try:
     import talib
     _HAS_TALIB = True
@@ -10,6 +13,8 @@ import pandas as pd
 
 
 class TvChart:
+    _server_thread = None
+
     def __init__(self, symbol, cfg):
         self.symbol = symbol
         self.cfg = cfg
@@ -19,6 +24,19 @@ class TvChart:
         self._placeholder_written = False
         self._pl_max_abs = 1.0
         self.indicators = []
+
+    def _start_server(self):
+        if TvChart._server_thread is not None:
+            return
+        def run_server():
+            port = 8000
+            os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            handler = http.server.SimpleHTTPRequestHandler
+            with socketserver.TCPServer(("", port), handler) as httpd:
+                print(f"Serving HTTP on port {port}")
+                httpd.serve_forever()
+        TvChart._server_thread = threading.Thread(target=run_server, daemon=True)
+        TvChart._server_thread.start()
 
     def _load_html_template(self, filename):
         # Template files are in the templates/ directory
@@ -44,12 +62,13 @@ class TvChart:
             f.write(placeholder)
         self._placeholder_written = True
         if getattr(self.cfg, 'tv_auto_open', False) and not self._opened:
-            import webbrowser
+            import subprocess
             try:
-                webbrowser.open('file://' + os.path.abspath(html_path))
+                print(f"Opening HTML file in VS Code: {html_path}")
+                subprocess.run(["code", html_path], check=False)
                 self._opened = True
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Failed to open in VS Code: {e}")
         return html_path
 
     def maybe_export(self, df, completed_trades, force=False):
@@ -124,12 +143,13 @@ class TvChart:
             with open(self._last_export_path, 'w', encoding='utf-8') as f:
                 f.write(html_template)
             if getattr(self.cfg, 'tv_auto_open', False) and not self._opened:
-                import webbrowser
+                import subprocess
                 try:
-                    webbrowser.open('file://' + os.path.abspath(self._last_export_path))
+                    print(f"Opening HTML file in VS Code: {self._last_export_path}")
+                    subprocess.run(["code", self._last_export_path], check=False)
                     self._opened = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Failed to open in VS Code: {e}")
             return self._last_export_path
         except Exception as e:
             try:

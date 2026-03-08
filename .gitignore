@@ -1,0 +1,22 @@
+# Python virtual environment
+.venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Editor directories
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Output data
+algo/output/
