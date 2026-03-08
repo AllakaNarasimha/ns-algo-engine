@@ -3,7 +3,7 @@ import pandas as pd
 from .orb_config import OrbConfig
 
 class ORBSignal:
-    def __init__(self, df, config: OrbConfig):
+    def __init__(self, df: pd.DataFrame, config: OrbConfig) -> None:
         self.df = df.sort_index()
         self.config = config
         self.range_high = None
@@ -15,9 +15,16 @@ class ORBSignal:
         self.pivot_candle_time = None
         self.entry_signal_data = None
         self.pivot_traded = False  # Flag to track if we've traded this pivot
-        self.trade_date = self.df.index[0].date()
-        self.orb_start_dt = pd.to_datetime(f"{self.trade_date.strftime('%Y-%m-%d')} {self.config.orb_start_time.strftime('%H:%M:%S')}").tz_localize(self.df.index.tz)
-        self.orb_end_dt = pd.to_datetime(f"{self.trade_date.strftime('%Y-%m-%d')} {self.config.orb_end_time.strftime('%H:%M:%S')}").tz_localize(self.df.index.tz)
+        
+        if not self.df.empty:
+            self.trade_date = self.df.index[0].date()
+            self.orb_start_dt = pd.to_datetime(f"{self.trade_date.strftime('%Y-%m-%d')} {self.config.orb_start_time.strftime('%H:%M:%S')}").tz_localize(self.df.index.tz)
+            self.orb_end_dt = pd.to_datetime(f"{self.trade_date.strftime('%Y-%m-%d')} {self.config.orb_end_time.strftime('%H:%M:%S')}").tz_localize(self.df.index.tz)
+        else:
+            # Initialize with None, will be set when first candle is added
+            self.trade_date = None
+            self.orb_start_dt = None
+            self.orb_end_dt = None
         self.set_orb_range()
 
     def set_orb_range(self):

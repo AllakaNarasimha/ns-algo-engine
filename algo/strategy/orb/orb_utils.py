@@ -1,22 +1,25 @@
 from datetime import timedelta
 import re
+import pandas as pd
+from typing import Optional, Dict, Any
+
 
 class CandleAggregator:
     """
     Handles candle construction logic based on tick data.
     Aggregates price ticks into OHLC candles based on specified granularity.
     """
-    def __init__(self, granularity='1m'):
+    def __init__(self, granularity: str = '1m') -> None:
         self.granularity = granularity
         match = re.match(r'^(\d+)(MS|S|m|h|d|w|M)$', self.granularity)
         if not match:
             raise ValueError("granularity must be in the format <number><unit> where unit is one of MS, S, m, h, d, w, M")
         self.num = int(match.group(1))
         self.unit = match.group(2)
-        self.current_bucket = None
-        self.ohlc = None  # {'time', 'open', 'high', 'low', 'close'}
+        self.current_bucket: Optional[pd.Timestamp] = None
+        self.ohlc: Optional[Dict[str, Any]] = None  # {'time', 'open', 'high', 'low', 'close'}
 
-    def get_bucket_start(self, dt):
+    def get_bucket_start(self, dt: pd.Timestamp) -> pd.Timestamp:
         if self.unit == 'MS':
             # MS is millisecond, 1ms = 1000 microseconds
             ms = self.num * 1000
@@ -47,7 +50,7 @@ class CandleAggregator:
         else:
             raise ValueError(f"Unsupported unit: {self.unit}")
 
-    def update(self, candle, dt):
+    def update(self, candle: Dict[str, Any], dt: pd.Timestamp) -> Optional[Dict[str, Any]]:
         """
         Update with a new price tick at given datetime.
         Returns finalized candle if bucket changes, else None.
@@ -59,23 +62,26 @@ class CandleAggregator:
             # Finalize previous candle if exists
             finalized = self.ohlc.copy() if self.ohlc else None
             # Start new candle
+            ltp = candle.get('ltp') or candle.get('close')
             self.ohlc = {
                 'timestamp': bucket_ts,
-                'open': candle['open'] if 'open' in candle and candle['open'] is not None else candle['ltp'],
-                'high': candle['high'] if 'high' in candle and candle['high'] is not None else candle['ltp'],
-                'low': candle['low'] if 'low' in candle and candle['low'] is not None else candle['ltp'],
-                'close': candle['close'] if 'close' in candle and candle['close'] is not None else candle['ltp']
+                'open': candle.get('open', ltp),
+                'high': candle.get('high', ltp),
+                'low': candle.get('low', ltp),
+                'close': candle.get('close', ltp)
             }
             self.current_bucket = bucket_ts
             return finalized
         else:
             # Update current candle
-            self.ohlc['high'] = max(self.ohlc['high'], candle['high'] if 'high' in candle and candle['high'] is not None else candle['ltp'])
-            self.ohlc['low'] = min(self.ohlc['low'], candle['low'] if 'low' in candle and candle['low'] is not None else candle['ltp'])
-            self.ohlc['close'] = candle['close'] if 'close' in candle and candle['close'] is not None else candle['ltp']
+            ltp = candle.get('ltp') or candle.get('close')
+            if self.ohlc:
+                self.ohlc['high'] = max(self.ohlc['high'], candle.get('high', ltp))
+                self.ohlc['low'] = min(self.ohlc['low'], candle.get('low', ltp))
+                self.ohlc['close'] = candle.get('close', ltp)
             return None
 
-    def finalize_current(self):
+    def finalize_current(self) -> Optional[Dict[str, Any]]:
         """Manually finalize and return the current candle."""
         if self.ohlc:
             finalized = self.ohlc.copy()
@@ -84,7 +90,47 @@ class CandleAggregator:
             return finalized
         return None
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the aggregator state."""
         self.current_bucket = None
         self.ohlc = None
+
+
+class CandleManager:
+    """
+    Manages the candles DataFrame and indicator injection.
+    """
+    def __init__(self) -> None:
+        self.candles_df = pd.DataFrame(columns=['timestamp'])
+        self.candles_df.set_index('timestamp', inplace=True)
+
+    def add_candle(self, candle: Dict[str, Any]) -> None:
+        """Add a finalized candle to the DataFrame."""
+        new_candle_df = pd.DataFrame([candle]).set_index('timestamp')
+        self.candles_df = pd.concat([self.candles_df, new_candle_df])
+
+    def inject_indicators(self, candle_dt: pd.Timestamp, indicators: Dict[str, Any], 
+                         data_state_manager: Any) -> None:
+        """Inject indicators into the candles DataFrame."""
+        try:
+            if candle_dt in self.candles_df.iloc[:data_state_manager.current_index].index:
+                indicator_columns = ['orb_time', 'pivot_time', 'pivot_high', 'pivot_low', 
+                                   'pivot_direction', 'range_high', 'range_low']
+                for k in indicator_columns:
+                    if k in indicators:
+                        self.candles_df.at[candle_dt, k] = indicators[k]
+                
+                # Forward fill certain indicators
+                ffill_columns = ['orb_time', 'pivot_high', 'pivot_low', 'range_high', 'range_low']
+                for k in ffill_columns:
+                    try:
+                        self.candles_df[k] = self.candles_df[k].ffill()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    def reset(self) -> None:
+        """Reset the candles DataFrame."""
+        self.candles_df = pd.DataFrame(columns=['timestamp'])
+        self.candles_df.set_index('timestamp', inplace=True)
