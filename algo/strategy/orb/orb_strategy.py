@@ -4,7 +4,6 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
 from .orb_config import OrbConfig
 from .orb_signal import ORBSignal
 from .orb_utils import CandleAggregator
@@ -12,22 +11,28 @@ from .orb_trade_manager import ORBTradeManager
 from algo.utils.app_config import AppConfig
 from algo.engine.data_state_manager import DataStateManager
 import logging
+import pandas as pd
 
 logging.basicConfig(filename='trading.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class ORBStrategy:
-    def __init__(self, df, app_config: AppConfig, data_state_manager: DataStateManager):
+    def __init__(self, app_config: AppConfig, data_state_manager: DataStateManager):
         self.app_config: AppConfig = app_config
         self.config = OrbConfig.from_app_config(app_config)
-        self.df = df
         self.data_state_manager = data_state_manager
         # Logging / storage
         self.logger = logging.getLogger(__name__)
         self._end_time = self._parse_time(app_config.end_time)
 
+        # status dataframes
+        self.candles_df = pd.DataFrame(columns= ['timestamp'])
+        self.candles_df.set_index('timestamp', inplace=True)
+
+        self.orb_signal = None
+        self.orb_trade_manager = None
         # Initialize components
-        self.orb_signal = ORBSignal(df, self.config)
-        self.orb_trade_manager = ORBTradeManager(self.config, self._end_time, self.orb_signal)
+        # self.orb_signal = ORBSignal(self.candles_df, self.config)
+        # self.orb_trade_manager = ORBTradeManager(self.config, self._end_time, self.orb_signal)
         # Candle aggregator for tick-based updates
         self.candle_aggregator = CandleAggregator(self.config.candle_granularity)
         # Daily control
@@ -38,12 +43,14 @@ class ORBStrategy:
         return datetime.datetime.strptime(time_str, '%H:%M').time()
     
     def reset(self):
-        self.orb_trade_manager.reset()
+        # self.orb_trade_manager.reset()
         if self.candle_aggregator:
             self.candle_aggregator.reset()
+        # self.candles_df = pd.DataFrame(columns= ['timestamp'])
+        # self.candles_df.set_index('timestamp', inplace=True)
         self.current_trade_day = None
 
-    def update(self, price, current_datetime):
+    def update(self, candle, current_datetime):
         # Detect day change
         trade_day = current_datetime.date()
         if self.current_trade_day is None:
@@ -53,13 +60,22 @@ class ORBStrategy:
             self.reset()
             self.current_trade_day = trade_day
         # Aggregate ticks into candles
-        finalized_candle = self.candle_aggregator.update(price, current_datetime)
+        finalized_candle = self.candle_aggregator.update(candle, current_datetime)
         if finalized_candle:
+            new_candle_df = pd.DataFrame([finalized_candle]).set_index('timestamp')
+            self.candles_df = pd.concat([self.candles_df, new_candle_df])
+
+            if not self.orb_signal:
+                self.orb_signal = ORBSignal(self.candles_df, self.config)
+                self.orb_trade_manager = ORBTradeManager(self.config, self._end_time, self.orb_signal)
+            else:
+                self.orb_signal.df = self.candles_df
+
             return self._process_candle(finalized_candle)
         return None    
 
     def _process_candle(self, candle):
-        """Process a finalized candle through pivots and trade manager."""
+        """Process a finalized candle through pivots and trade manager."""   
         signal = self.orb_trade_manager.update_candle(candle)  
         
         self._process_candle_signals(candle)
@@ -72,13 +88,13 @@ class ORBStrategy:
         try:
             candle_dt = candle['timestamp']
             inds = self.get_indicators()
-            if candle_dt in self.df.iloc[:self.data_state_manager.current_index].index:
+            if candle_dt in self.candles_df.iloc[:self.data_state_manager.current_index].index:
                 for k in [ 'orb_time', 'pivot_time', 'pivot_high', 'pivot_low', 'pivot_direction', 'range_high', 'range_low']:
                     if k in inds:
-                        self.df.at[candle_dt, k] = inds[k]
+                        self.candles_df.at[candle_dt, k] = inds[k]
                 for k in ['orb_time', 'pivot_high', 'pivot_low', 'range_high', 'range_low']:
                     try:
-                        self.df[k] = self.df[k].ffill()
+                        self.candles_df[k] = self.candles_df[k].ffill()
                     except Exception:
                         pass
         except Exception:

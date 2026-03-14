@@ -1,3 +1,4 @@
 pandas
-lightweight_charts
 TA-Lib
+pytest
+./algo/libs/nslogger-1.0.0.tar.gz

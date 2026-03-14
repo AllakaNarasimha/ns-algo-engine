@@ -44,17 +44,21 @@ class TradeManager:
         if trade_signal is None:
             return trade_data
         
+        # Check if this is an exit-only signal (stop loss, etc.)
+        is_exit_only = trade_signal.get('action') in ['stop_exit', 'exit', 'eod_exit']
+        
         if trade_signal['signal'] == 'buy':
             # Always allow closing an opposing position
             if self.position == 'short':
                 trade_data = self._close_position(current_candle)
-            # Only open a new long if entries are allowed
-            if allow_new_entries and self.position != 'long':
+            # Only open a new long if entries are allowed AND not an exit-only signal
+            if allow_new_entries and self.position != 'long' and not is_exit_only:
                 self._open_position('long', current_candle)
         elif trade_signal['signal'] == 'sell' :
             if self.position == 'long':
                 trade_data = self._close_position(current_candle)
-            if allow_new_entries and self.position != 'short':
+            # Only open a new short if entries are allowed AND not an exit-only signal
+            if allow_new_entries and self.position != 'short' and not is_exit_only:
                 self._open_position('short', current_candle)        
         
         return trade_data

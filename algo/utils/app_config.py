@@ -1,15 +1,7 @@
 import xml.etree.ElementTree as ET
-import os
-from typing import List, Dict, Any
 
 class AppConfig:
-    def __init__(self, config_path: str = None, **kwargs):
-        # Determine config path based on __file__ location if not provided
-        if config_path is None:
-            # Go up 3 directories from this file to reach the root where config.xml is
-            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.xml')
-        
-        self.config_path = config_path
+    def __init__(self, **kwargs):
         default_cfg = dict(
             db_dir=None, db_file=None, symbol=None, underlying=None, segment=None,
             instrument_type=None, exchange=None, strategy_type='ema', strategy_params=None,
@@ -28,17 +20,16 @@ class AppConfig:
             pl_line_hover_only=False, # if True show PL line only on hover
             tv_volume_ratio=0.25,     # fraction (0.10-0.50) of vertical space for volume pane
             tv_pl_separate_panel=False, # if True render cumulative P&L in its own chart below
-            volume_mode='tick_count' # how to derive volume: tick_count | price_range | abs_return | real
+            volume_mode='tick_count', # how to derive volume: tick_count | price_range | abs_return | real
+            additional_indicators=None
             # session_close_time removed: strategy now responsible for EOD logic
         )
         for k, v in default_cfg.items():
             setattr(self, k, kwargs.get(k, v))
     
     @classmethod
-    def from_xml(cls, xml_path: str = None):
-        """Load configuration from XML file. If xml_path is None, uses default location based on __file__"""
-        if xml_path is None:
-            xml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.xml')
+    def from_xml(cls, xml_path):
+        """Load configuration from XML file"""
         tree = ET.parse(xml_path)
         root = tree.getroot()
         
@@ -78,41 +69,39 @@ class AppConfig:
                         # Parse nested strategy parameters
                         strategy_params = {}
                         for param in subelem:
-                            strategy_params[param.tag] = convert_value(param.text)
+                            if param.tag == 'additional_indicators':
+                                indicators = []
+                                for ind_elem in param:
+                                    if ind_elem.tag in ('indicator', 'multi_indicator'):
+                                        ind_dict = {'type': ind_elem.tag, 'name': None, 'params': {}}
+                                        for sub in ind_elem:
+                                            if sub.tag == 'name':
+                                                ind_dict['name'] = convert_value(sub.text)
+                                            elif sub.tag == 'params':
+                                                params = []
+                                                for p in sub:
+                                                    if p.tag == 'param':
+                                                        param_dict = {}
+                                                        for subp in p:
+                                                            param_dict[subp.tag] = convert_value(subp.text)
+                                                        params.append(param_dict)
+                                                ind_dict['params'] = params
+                                        indicators.append(ind_dict)
+                                strategy_params['additional_indicators'] = indicators
+                            else:
+                                strategy_params[param.tag] = convert_value(param.text)
                         config_dict['strategy_params'] = strategy_params
             else:
                 config_dict[elem.tag] = convert_value(elem.text)
         
-        return cls(config_path=xml_path, **config_dict)
-    
-    def load_chart_indicators(self) -> List[Dict[str, Any]]:
-        """Load chart indicators from NSChart section in config.xml"""
-        tree = ET.parse(self.config_path)
-        root = tree.getroot()
+        # Set additional_indicators from strategy_params
+        if 'strategy_params' in config_dict and 'additional_indicators' in config_dict['strategy_params']:
+            config_dict['additional_indicators'] = config_dict['strategy_params']['additional_indicators']
         
-        indicators = []
-        nschart = root.find('NSChart')
-        if nschart is not None:
-            indicators_elem = nschart.find('Indicators')
-            if indicators_elem is not None:
-                for ind_elem in indicators_elem.findall('Indicator'):
-                    name = ind_elem.find('Name')
-                    value = ind_elem.find('Value')
-                    type_ = ind_elem.find('Type')
-                    color = ind_elem.find('Color')
-                    linewidth = ind_elem.find('LineWidth')
-                    run_on_candle = ind_elem.find('RunOnCandle')
-                    visible = ind_elem.find('Visible')
-                    
-                    indicator_dict = {
-                        'name': name.text.strip() if name is not None and name.text else None,
-                        'value': int(value.text.strip()) if value is not None and value.text else None,
-                        'type': type_.text.strip() if type_ is not None and type_.text else 'line',
-                        'color': color.text.strip() if color is not None and color.text else '#FF0000',
-                        'linewidth': int(linewidth.text.strip()) if linewidth is not None and linewidth.text else 1,
-                        'run_on_candle': run_on_candle.text.strip() if run_on_candle is not None and run_on_candle.text else 'close',
-                        'visible': visible.text.strip().lower() == 'true' if visible is not None and visible.text else True
-                    }
-                    indicators.append(indicator_dict)
+        # Update CSV names with symbol
+        symbol = config_dict.get('symbol')
+        if symbol:
+            config_dict['trades_csv'] = config_dict['trades_csv'].replace('SYMBOL', symbol)
+            config_dict['export_csv'] = config_dict['export_csv'].replace('SYMBOL', symbol)
         
-        return indicators
+        return cls(**config_dict)

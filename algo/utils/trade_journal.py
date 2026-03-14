@@ -2,11 +2,11 @@ import logging
 import os
 import pandas as pd
 from .app_config import AppConfig
-from .ns_tvchart import TvChart
 
 
 class TradeJournal:
-    def __init__(self, app_config: AppConfig):
+    def __init__(self, symbol, app_config: AppConfig):
+        self.symbol = symbol
         self.cfg = app_config
         self.trades_csv = app_config.trades_csv
         self.trades = []
@@ -16,7 +16,7 @@ class TradeJournal:
     def update_trade_data(self, candle_dt, price, trade_data):
         if trade_data:
             self.trade_count += 1
-            self.save_trade(trade_data, {'symbol': self.cfg.symbol, 'instrument_type': self.cfg.instrument_type})
+            self.save_trade(trade_data, {'symbol': self.symbol, 'instrument_type': self.cfg.instrument_type})
                 
             # Track completed trades for P&L display on chart
             if trade_data.get('position_state') in ['closed', 'exit'] and 'profit_loss' in trade_data:

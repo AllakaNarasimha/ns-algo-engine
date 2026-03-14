@@ -6,7 +6,7 @@ class DataStateManager:
         self.current_index = -1
 
     def get_latest_record(self, df):
-        if df is None or (hasattr(df, 'empty') and df.empty) or (isinstance(df, list) and len(df) == 0):
+        if df is None or df.empty:
             return None
         
         if self.current_index < 0:
@@ -15,18 +15,12 @@ class DataStateManager:
         if self.current_index >= len(df):
             return None
 
-        if isinstance(df, list):
-            record = df[self.current_index]
-            self.current_index += 1
-            return record
-        else:
-            # DataFrame case
-            record = df.iloc[self.current_index]
-            self.current_index += 1
-            
-            # Include the index (timestamp) in the returned dict
-            record_dict = record.to_dict()
-            record_dict['timestamp'] = pd.to_datetime(record.name, unit='s', utc=True).tz_convert('Asia/Kolkata')
-            return record_dict
+        record = df.iloc[self.current_index]
+        self.current_index += 1
+        
+        # Include the index (timestamp) in the returned dict
+        record_dict = record.to_dict()
+        record_dict['timestamp'] = pd.to_datetime(record.name, unit='s', utc=True).tz_convert('Asia/Kolkata')
+        return record_dict
             
 

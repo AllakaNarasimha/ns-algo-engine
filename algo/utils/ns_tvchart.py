@@ -1,8 +1,5 @@
 import os
 import json
-from typing import Dict, List, Any
-
-from algo.templates.trading_view_chart import TradingViewChart
 try:
     import talib
     _HAS_TALIB = True
@@ -13,14 +10,15 @@ import pandas as pd
 
 
 class TvChart:
-    def __init__(self, cfg):
+    def __init__(self, symbol, cfg):
+        self.symbol = symbol
         self.cfg = cfg
         self._update_counter = 0
         self._last_export_path = None
         self._opened = False
         self._placeholder_written = False
         self._pl_max_abs = 1.0
-        self.trading_view_chart = TradingViewChart()
+        self.indicators = []
 
     def _load_html_template(self, filename):
         # Template files are in the templates/ directory
@@ -48,10 +46,8 @@ class TvChart:
         if getattr(self.cfg, 'tv_auto_open', False) and not self._opened:
             import webbrowser
             try:
-                # webbrowser.open('file://' + os.path.abspath(html_path))
+                webbrowser.open('file://' + os.path.abspath(html_path))
                 self._opened = True
-                self.trading_view_chart.chart.show()
-                
             except Exception:
                 pass
         return html_path
@@ -95,30 +91,43 @@ class TvChart:
             if 'signal' in df.columns:
                 df['signal'] = df['signal'].apply(lambda x: x.get('signal') if isinstance(x, dict) else x)
             candles_json = self._prepare_candles(df)
-            ema5_series = self._prepare_ema_series(df, 'ema5', candles_json)
-            ema20_series = self._prepare_ema_series(df, 'ema20', candles_json)
-            indicators = [
-                { 'name': 'EMA5', 'color': 'yellow', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema5_series},
-                { 'name': 'EMA20', 'color': 'cyan', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema20_series}
-            ]
+            
+            # Add additional indicators
+            if self.cfg.additional_indicators:
+                for ind in self.cfg.additional_indicators:
+                    name = ind['name']
+                    params = ind['params']
+                    if name == 'EMA':
+                        if ind['type'] == 'multi_indicator':
+                            for param in params:
+                                period = param['period']
+                                color = param['color']
+                                ema_series = self._prepare_ema_series(df, f'ema{period}', candles_json)
+                                self.indicators.append({'name': f'EMA{period}', 'color': color, 'lineWidth': 1, 'priceLineVisible': False, 'data': ema_series})
+            else:
+                ema5_series = self._prepare_ema_series(df, 'ema5', candles_json)
+                ema20_series = self._prepare_ema_series(df, 'ema20', candles_json)
+                self.indicators = [
+                    { 'name': 'EMA5', 'color': 'yellow', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema5_series},
+                    { 'name': 'EMA20', 'color': 'cyan', 'lineWidth': 1, 'priceLineVisible': False, 'data': ema20_series}
+                ]
+
             pivot_lines = self._prepare_pivot_lines(df, candles_json)
             markers = self._prepare_markers(df, completed_trades, candles_json)
             trade_data = self._prepare_trade_data(completed_trades, df, candles_json)
             cum_pl_series = self._prepare_cum_pl(completed_trades, df, candles_json)
             html_template = self._load_html_template('tv_chart_template.html')
-            html_template = self._apply_template_replacements(html_template, final, candles_json, indicators, markers, cum_pl_series, pivot_lines, trade_data)
+            symbol = self.cfg.export_csv.split('_')[0]
+            html_template = self._apply_template_replacements(html_template, final, candles_json, self.indicators, markers, cum_pl_series, pivot_lines, trade_data, symbol)
             self._last_export_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), self.cfg.export_csv) 
 
             with open(self._last_export_path, 'w', encoding='utf-8') as f:
                 f.write(html_template)
-            
-            self.trading_view_chart.generate_from_html_template(df, cum_pl_series, markers, trade_data, True, True, None, None)
             if getattr(self.cfg, 'tv_auto_open', False) and not self._opened:
                 import webbrowser
                 try:
-                    # webbrowser.open('file://' + os.path.abspath(self._last_export_path))
+                    webbrowser.open('file://' + os.path.abspath(self._last_export_path))
                     self._opened = True
-                    self.trading_view_chart.chart.show()
                 except Exception:
                     pass
             return self._last_export_path
@@ -133,7 +142,7 @@ class TvChart:
                 pass
             return None
 
-    def _apply_template_replacements(self, html_template, final, candles_json, indicators, markers, cum_pl_series, pivot_lines, trade_data):
+    def _apply_template_replacements(self, html_template, final, candles_json, indicators, markers, cum_pl_series, pivot_lines, trade_data, symbol):
         separate_pl = getattr(self.cfg, 'tv_pl_separate_panel', False)
         if separate_pl:
             html_template = html_template.replace('%PLDIV%', "<div id='plpanel'></div>") \
@@ -165,14 +174,20 @@ class TvChart:
             if '</body></html>' in html_template:
                 html_template = html_template.replace('</body></html>', no_refresh_script + '\n</body></html>')
 
+        data_obj = {
+            'symbol_name': self.symbol,
+            'data': {
+                'candles': candles_json,
+                'indicators': indicators,
+                'markers': markers,
+                'cum_pl': cum_pl_series,
+                'trade_data': trade_data
+            }
+        }
         html_template = (html_template
-                         .replace('__CANDLES__', json.dumps(candles_json))
-                         .replace('__INDICATORS__', json.dumps(indicators))
-                         .replace('__MARKERS__', json.dumps(markers))
-                         .replace('__CUM_PL__', json.dumps(cum_pl_series))
+                         .replace('__SYMBOL_DATA__', json.dumps(data_obj))
                          .replace('__PL_HOVER__', 'true' if getattr(self.cfg, 'pl_line_hover_only', False) else 'false')
-                         .replace('__VOL_RATIO__', str(getattr(self.cfg, 'tv_volume_ratio', 0.25)))
-                         .replace('__TRADE_DATA__', json.dumps(trade_data))
+                         .replace('__VOL_RATIO__', str(getattr(self.cfg, 'tv_volume_ratio', 0.25)))                         
                          .replace('%SEPARATE_PL%', 'true' if separate_pl else 'false'))
 
         pivot_lines_js = json.dumps(pivot_lines)
@@ -193,16 +208,32 @@ class TvChart:
         return html_template
 
     def _prepare_emas(self, df):
-        if 'ema5' not in df.columns or df['ema5'].isna().all():
-            if _HAS_TALIB:
-                df['ema5'] = talib.EMA(df['close'].astype(float), timeperiod=5)
-            else:
-                df['ema5'] = df['close'].rolling(5, min_periods=1).mean()
-        if 'ema20' not in df.columns or df['ema20'].isna().all():
-            if _HAS_TALIB:
-                df['ema20'] = talib.EMA(df['close'].astype(float), timeperiod=20)
-            else:
-                df['ema20'] = df['close'].rolling(20, min_periods=1).mean()
+        # Compute additional indicators
+        if self.cfg.additional_indicators:
+            for ind in self.cfg.additional_indicators:
+                name = ind['name']
+                params = ind['params']
+                if name == 'EMA':
+                    if ind['type'] == 'multi_indicator':
+                        for param in params:
+                            period = param['period']
+                            if _HAS_TALIB:
+                                ema_values = talib.EMA(df['close'].astype(float), timeperiod=period)
+                            else:
+                                ema_values = df['close'].rolling(period, min_periods=1).mean()
+                            df[f'ema{period}'] = ema_values
+        else:
+            if 'ema5' not in df.columns or df['ema5'].isna().all():
+                if _HAS_TALIB:
+                    df['ema5'] = talib.EMA(df['close'].astype(float), timeperiod=5)
+                else:
+                    df['ema5'] = df['close'].rolling(5, min_periods=1).mean()
+            if 'ema20' not in df.columns or df['ema20'].isna().all():
+                if _HAS_TALIB:
+                    df['ema20'] = talib.EMA(df['close'].astype(float), timeperiod=20)
+                else:
+                    df['ema20'] = df['close'].rolling(20, min_periods=1).mean()
+
 
     def _prepare_candles(self, df):
         candles_json = []
@@ -441,7 +472,7 @@ class TvChart:
                         })
         return markers
 
-    def _prepare_trade_data(self, completed_trades, df, candles_json) -> Dict[str, List[Dict[str, Any]]]:
+    def _prepare_trade_data(self, completed_trades, df, candles_json):
         trade_data = {}
         ts_time_map = {pd.to_datetime(ts): c['time'] for ts, c in zip(df.index, candles_json)}
 

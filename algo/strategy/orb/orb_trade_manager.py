@@ -35,7 +35,10 @@ class ORBTradeManager:
         Update with a new candle. Processes pivots and manages position.
         Returns signal dict if entry or exit occurs.
         """
-        if self.trades_taken_today < self.max_trades_per_day and not self.require_range_retouch:
+        if self.orb_signal.trade_date != candle['timestamp'].date():
+            self.trades_taken_today = 0
+
+        if self.trades_taken_today >= self.max_trades_per_day:
             return None
         
         # Update pivots first
@@ -50,46 +53,55 @@ class ORBTradeManager:
             self.pivot_direction =  pivot_result['pivot_direction']
             self.pivot_candle_time = pivot_result['pivot_time']
             self.trades_taken_today += 1
+            # Mark the pivot as traded to prevent re-entry on same pivot
+            self.orb_signal.mark_pivot_traded()
             if self.pivot_direction == 'bull':
-                self.entry_price = pivot_result['orb_high']
-                self.stop_loss = pivot_result['orb_low']
-                if self.stop_loss_pct and self.entry_price:
-                    pct_stop = self.entry_price * (1 - self.stop_loss_pct)
-                    if pct_stop > self.stop_loss:
-                        self.stop_loss = pct_stop
+                self.entry_price = candle['open']
+                self.stop_loss = pivot_result['pivot_low']
+                self.trailing_step = (self.entry_price - self.stop_loss)
+                self.target_price = self.entry_price + self.trailing_step
+                self.last_trail_level = self.stop_loss
+                # if self.stop_loss_pct and self.entry_price:
+                #     pct_stop = self.entry_price * (1 - self.stop_loss_pct)
+                #     if pct_stop > self.stop_loss:
+                #         self.stop_loss = pct_stop
                 if self.target_pct and self.entry_price:
                     self.target_price = self.entry_price * (1 + self.target_pct)
-                if self.trailing_stop_pct:
-                    self.trailing_step = self.entry_price * self.trailing_stop_pct
-                    self.last_trail_level = self.entry_price + self.trailing_step
-                    candidate_sl = self.entry_price - self.trailing_step
-                    if candidate_sl > self.stop_loss:
-                        self.stop_loss = candidate_sl
+                # if self.trailing_stop_pct:
+                #     self.trailing_step = self.entry_price * self.trailing_stop_pct
+                #     self.last_trail_level = self.entry_price + self.trailing_step
+                #     candidate_sl = self.entry_price - self.trailing_step
+                #     if candidate_sl > self.stop_loss:
+                #         self.stop_loss = candidate_sl
                 # Check if target hit on entry candle
-                if self.target_price and candle['high'] >= self.target_price and not self.target_locked:
-                    if self.stop_loss < self.target_price:
-                        self.stop_loss = self.target_price
-                    self.target_locked = True
+                # if self.target_price and candle['high'] >= self.target_price and not self.target_locked:
+                #     if self.stop_loss < self.target_price:
+                #         self.stop_loss = self.target_price
+                #     self.target_locked = True
             else:  # bear
-                self.entry_price = pivot_result['orb_low']
-                self.stop_loss = pivot_result['orb_high']
-                if self.stop_loss_pct and self.entry_price:
-                    pct_stop = self.entry_price * (1 + self.stop_loss_pct)
-                    if pct_stop < self.stop_loss:
-                        self.stop_loss = pct_stop
+                self.entry_price = candle['open']
+                self.stop_loss = pivot_result['pivot_high']
+                self.trailing_step = (self.stop_loss - self.entry_price)
+                self.target_price = self.entry_price - self.trailing_step
+                self.last_trail_level = self.stop_loss
+                
+                # if self.stop_loss_pct and self.entry_price:
+                #     pct_stop = self.entry_price * (1 + self.stop_loss_pct)
+                #     if pct_stop < self.stop_loss:
+                #         self.stop_loss = pct_stop
                 if self.target_pct and self.entry_price:
                     self.target_price = self.entry_price * (1 - self.target_pct)
-                if self.trailing_stop_pct:
-                    self.trailing_step = self.entry_price * self.trailing_stop_pct
-                    self.last_trail_level = self.entry_price - self.trailing_step
-                    candidate_sl = self.entry_price + self.trailing_step
-                    if candidate_sl < self.stop_loss:
-                        self.stop_loss = candidate_sl
+                # if self.trailing_stop_pct:
+                #     self.trailing_step = self.entry_price * self.trailing_stop_pct
+                #     self.last_trail_level = self.entry_price - self.trailing_step
+                #     candidate_sl = self.entry_price + self.trailing_step
+                #     if candidate_sl < self.stop_loss:
+                #         self.stop_loss = candidate_sl
                 # Check if target hit on entry candle
-                if self.target_price and candle['low'] <= self.target_price and not self.target_locked:
-                    if self.stop_loss > self.target_price:
-                        self.stop_loss = self.target_price
-                    self.target_locked = True
+                # if self.target_price and candle['low'] <= self.target_price and not self.target_locked:
+                #     if self.stop_loss > self.target_price:
+                #         self.stop_loss = self.target_price
+                #     self.target_locked = True
             self.prev_candle = candle.copy()
             return {
                 'signal': pivot_result['entry_signal'],
@@ -107,7 +119,7 @@ class ORBTradeManager:
             if self.pivot_direction == 'bull':
                 if self.stop_loss and candle['low'] <= self.stop_loss:
                     self.in_position = False
-                    self.orb_signal.pivot_candle = None  # Reset pivot on exit
+                    # Pivot already marked as traded on entry - no re-entry possible
                     return {
                         'signal': 'sell',
                         'action': 'stop_exit',
@@ -118,7 +130,7 @@ class ORBTradeManager:
             else:
                 if self.stop_loss and candle['high'] >= self.stop_loss:
                     self.in_position = False
-                    self.orb_signal.pivot_candle = None  # Reset pivot on exit
+                    # Pivot already marked as traded on entry - no re-entry possible
                     return {
                         'signal': 'buy',
                         'action': 'stop_exit',
@@ -146,7 +158,7 @@ class ORBTradeManager:
                 # Post-adjust stop check
                 if self.stop_loss and candle['low'] <= self.stop_loss:
                     self.in_position = False
-                    self.orb_signal.pivot_candle = None  # Reset pivot on exit
+                    # Pivot already marked as traded on entry - no re-entry possible
                     return {
                         'signal': 'sell',
                         'action': 'stop_exit',
@@ -168,11 +180,11 @@ class ORBTradeManager:
                 else:
                     candidate = self.prev_candle['high']
                     if candidate and candidate < (self.stop_loss or float('inf')) and candidate > candle['high']:
-                        self.stop_loss = candidate
+                       self.stop_loss = candidate
                 # Post-adjust stop check
                 if self.stop_loss and candle['high'] >= self.stop_loss:
                     self.in_position = False
-                    self.orb_signal.pivot_candle = None  # Reset pivot on exit
+                    # Pivot already marked as traded on entry - no re-entry possible
                     return {
                         'signal': 'buy',
                         'action': 'stop_exit',
@@ -185,16 +197,16 @@ class ORBTradeManager:
 
         if self.end_time < candle['timestamp'].time():
             self.orb_signal.pivot_candle_time = None 
-            self.in_position = None
+            self.in_position = False  # Force exit if still in position after end time
             
         return None
 
     def reset(self):
-        """Reset trade state."""
-        self.orb_signal.reset()
+        """Reset trade state for new trading day."""
+        # Note: Don't reset pivot_traded flag here - 
+        # it gets reset in orb_signal.check_trade_signal() on day change
         self.trades_taken_today = 0
-        self.in_position = False
-        self.orb_signal.pivot_candle = None  # Reset pivot on exit
+        self.in_position = False           
         self.pivot_direction = None
         self.pivot_candle_time = None
         self.stop_loss = None
