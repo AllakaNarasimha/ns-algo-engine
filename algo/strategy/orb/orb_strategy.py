@@ -10,6 +10,7 @@ from algo.utils.app_config import AppConfig
 from algo.engine.data_state_manager import DataStateManager
 import logging
 import pandas as pd
+import pandas as pd
 
 logging.basicConfig(filename='trading.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -56,6 +57,7 @@ class ORBStrategy:
             self.current_trade_day = trade_day
         
         # Aggregate ticks into candles
+        finalized_candle = self.candle_aggregator.update(candle, current_datetime)
         finalized_candle = self.candle_aggregator.update(candle, current_datetime)
         if finalized_candle:
             self.candle_manager.add_candle(finalized_candle)

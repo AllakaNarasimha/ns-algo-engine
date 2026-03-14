@@ -55,6 +55,9 @@ class TradeManager:
         # Check if this is an exit-only signal (stop loss, etc.)
         is_exit_only = trade_signal.get('action') in ['stop_exit', 'exit', 'eod_exit']
         
+        # Check if this is an exit-only signal (stop loss, etc.)
+        is_exit_only = trade_signal.get('action') in ['stop_exit', 'exit', 'eod_exit']
+        
         if trade_signal['signal'] == 'buy':
             # Always allow closing an opposing position
             if self.position.position_type == 'short':

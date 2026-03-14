@@ -66,6 +66,7 @@ class TvChart:
             try:
                 print(f"Opening HTML file in VS Code: {html_path}")
                 subprocess.run(["code", html_path], check=False)
+                # webbrowser.open('file://' + os.path.abspath(html_path))
                 self._opened = True
             except Exception as e:
                 print(f"Failed to open in VS Code: {e}")
@@ -147,6 +148,7 @@ class TvChart:
                 try:
                     print(f"Opening HTML file in VS Code: {self._last_export_path}")
                     subprocess.run(["code", self._last_export_path], check=False)
+                    # webbrowser.open('file://' + os.path.abspath(self._last_export_path))
                     self._opened = True
                 except Exception as e:
                     print(f"Failed to open in VS Code: {e}")

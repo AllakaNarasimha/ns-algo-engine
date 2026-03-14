@@ -1,4 +1,5 @@
 pandas
 TA-Lib
-pytest
 -e ./algo/libs/nslogger-1.0.0
+pytest
+./algo/libs/nslogger-1.0.0.tar.gz
