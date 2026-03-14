@@ -40,10 +40,11 @@ class ORBStrategy:
         return datetime.datetime.strptime(time_str, '%H:%M').time()
     
     def reset(self) -> None:
-        """Reset daily state."""
-        self.orb_trade_manager.reset()
-        self.candle_aggregator.reset()
-        self.candle_manager.reset()
+        # self.orb_trade_manager.reset()
+        if self.candle_aggregator:
+            self.candle_aggregator.reset()
+        # self.candles_df = pd.DataFrame(columns= ['timestamp'])
+        # self.candles_df.set_index('timestamp', inplace=True)
         self.current_trade_day = None
 
     def update(self, candle: Dict[str, Any], current_datetime: pd.Timestamp) -> Optional[Dict[str, Any]]:
